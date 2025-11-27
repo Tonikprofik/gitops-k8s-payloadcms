@@ -1,0 +1,31 @@
+# =============================================================================
+# Prometheus Stack Values
+# =============================================================================
+#
+# Minimal configuration for kube-prometheus-stack Helm chart.
+# This file overrides default values for our demo environment.
+#
+# Full options: https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+#
+# =============================================================================
+
+# Grafana configuration
+grafana:
+  # Enable Grafana (disabled by default in some versions)
+  enabled: true
+
+  # Default admin password (change in production!)
+  # In production, use: adminPasswordSecretName to reference a Secret
+  adminPassword: "admin"
+
+  # Pre-configure Loki as additional data source
+  # This allows querying logs alongside metrics in the same dashboard
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      # Loki service URL within the cluster
+      # Format: http://<service>.<namespace>.svc.cluster.local:<port>
+      url: http://loki.monitoring.svc.cluster.local:3100
+      access: proxy
+      # Keep Prometheus as default for metrics dashboards
+      isDefault: false

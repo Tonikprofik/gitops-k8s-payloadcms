@@ -1,0 +1,110 @@
+# =============================================================================
+# PayloadCMS Deployment
+# =============================================================================
+#
+# Deploys PayloadCMS - a TypeScript/React/Next.js headless CMS.
+#
+# STACK (from package.json):
+#   - Next.js 15.4.4 with React 19.1
+#   - Payload 3.59.1 with Lexical rich text editor
+#   - PostgreSQL 16 via @payloadcms/db-vercel-postgres
+#   - Node.js 22.17.0 (required for Payload 3.59+)
+#   - pnpm package manager
+#
+# BUILD:
+#   Uses multi-stage Dockerfile with `next build` standalone output.
+#   Final image runs `node server.js` on port 3000.
+#
+# IMAGE:
+#   docker build -t ghcr.io/<username>/payload-cms:$(git rev-parse --short HEAD) .
+#   docker push ghcr.io/<username>/payload-cms:$(git rev-parse --short HEAD)
+#
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payload-cms
+spec:
+  # Single replica for demo - consider HPA for production
+  replicas: 1
+
+  # Selector must match pod template labels
+  selector:
+    matchLabels:
+      app: payload-cms
+
+  template:
+    metadata:
+      labels:
+        app: payload-cms
+    spec:
+      containers:
+        - name: payload
+          # TODO: Replace with your built PayloadCMS image
+          # Build: docker build -t ghcr.io/<your-username>/payload-cms:latest .
+          # Push: docker push ghcr.io/<your-username>/payload-cms:latest
+          image: ghcr.io/tonikprofik/payload-cms:latest
+          imagePullPolicy: IfNotPresent
+
+          # Next.js standalone server port (from CMD in Dockerfile)
+          ports:
+            - containerPort: 3000
+              name: http
+
+          # Inject all keys from payload-env secret as environment variables
+          # This includes PAYLOAD_SECRET and DATABASE_URI
+          envFrom:
+            - secretRef:
+                name: payload-env
+
+          # Additional env vars for Next.js/PayloadCMS
+          env:
+            # Database connection (from secret)
+            - name: DATABASE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: payload-env
+                  key: DATABASE_URI
+            # Node.js production mode
+            - name: NODE_ENV
+              value: "production"
+            # Hostname binding for Next.js standalone
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            # Port (matches containerPort)
+            - name: PORT
+              value: "3000"
+
+          # LIVENESS PROBE
+          # Kubernetes periodically checks this endpoint.
+          # If it fails 3 times, the pod is restarted.
+          livenessProbe:
+            httpGet:
+              # PayloadCMS health endpoint
+              path: /api/health
+              port: 3000
+            # Wait 60s for Next.js cold start + DB migration
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3
+
+          # READINESS PROBE
+          # Only route traffic when app is fully ready
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            failureThreshold: 3
+
+          # RESOURCE LIMITS
+          # Next.js 15 + Payload 3.59 + React 19 needs more RAM
+          # Adjust based on your content volume
+          resources:
+            requests:
+              cpu: "250m" # 0.25 CPU cores
+              memory: "512Mi" # 512 MiB RAM
+            limits:
+              cpu: "1000m" # 1 CPU core (Next.js builds can spike)
+              memory: "1536Mi" # 1.5 GiB RAM (Payload + Lexical editor)

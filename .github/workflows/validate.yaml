@@ -1,0 +1,32 @@
+name: Validate
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Validate Kustomize - PayloadCMS
+        run: kubectl kustomize apps/payload-cms/ > /dev/null
+
+      - name: Validate Kustomize - Observability
+        run: kubectl kustomize apps/observability/ > /dev/null
+
+      - name: YAML Lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: apps/ argocd/
+          config_data: |
+            extends: relaxed
+            rules:
+              line-length: disable
+              truthy: disable

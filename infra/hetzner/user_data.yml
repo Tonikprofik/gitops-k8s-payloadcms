@@ -1,0 +1,87 @@
+# =============================================================================
+# Cloud-Init Configuration for k3s + ArgoCD
+# =============================================================================
+#
+# This cloud-init script runs on first boot to:
+#   1. Update system packages
+#   2. Install k3s (lightweight Kubernetes)
+#   3. Install ArgoCD (GitOps controller)
+#   4. Set up auto-shutdown cron (cost safety net)
+#
+# CLOUD-INIT: Industry-standard tool for cloud instance initialization
+# Supported by: AWS, GCP, Azure, Hetzner, DigitalOcean, etc.
+#
+# DEBUG: Check /var/log/cloud-init-output.log on the server
+#
+# =============================================================================
+#cloud-config
+
+# Update package lists and upgrade installed packages on first boot
+package_update: true
+package_upgrade: true
+
+# Install additional packages needed for cluster management
+packages:
+  - curl # Required for k3s installer
+  - git # Useful for debugging and manual operations
+
+# Commands to run after packages are installed
+# Each command runs as root, in sequence
+runcmd:
+  # -------------------------------------------------------------------------
+  # 1. Install K3s (Lightweight Kubernetes)
+  # -------------------------------------------------------------------------
+  # K3s is a CNCF-certified Kubernetes distribution designed for:
+  #   - Edge computing
+  #   - IoT devices
+  #   - CI/CD environments
+  #   - Small production clusters
+  #
+  # It bundles: containerd, Flannel CNI, CoreDNS, Traefik ingress
+  # Single binary, ~50MB, starts in seconds
+  #
+  # --write-kubeconfig-mode 644: Makes kubeconfig world-readable
+  # (Needed for non-root kubectl access)
+  # -------------------------------------------------------------------------
+  - curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
+
+  # -------------------------------------------------------------------------
+  # 2. Wait for K3s to Initialize
+  # -------------------------------------------------------------------------
+  # K3s needs time to:
+  #   - Start containerd
+  #   - Bootstrap control plane components
+  #   - Create default namespaces
+  # 30 seconds is usually enough for cpx11 instance
+  # -------------------------------------------------------------------------
+  - sleep 30
+
+  # -------------------------------------------------------------------------
+  # 3. Install ArgoCD
+  # -------------------------------------------------------------------------
+  # ArgoCD is the GitOps controller that:
+  #   - Watches your Git repository
+  #   - Automatically syncs Kubernetes resources
+  #   - Self-heals drift from desired state
+  #
+  # This installs the "stable" release from ArgoCD's official manifests
+  # -------------------------------------------------------------------------
+  - kubectl create namespace argocd
+  - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+  # -------------------------------------------------------------------------
+  # 4. Auto-Shutdown Cron (COST SAFETY NET)
+  # -------------------------------------------------------------------------
+  # IMPORTANT: This prevents forgotten cloud resources from burning money!
+  #
+  # Cron expression: "0 */2 * * *" = At minute 0 of every 2nd hour
+  # This means: Server auto-shuts-down ~2 hours after creation
+  #
+  # In production: Remove this line and use proper lifecycle management
+  # For demos: This is a safety net if you forget to terraform destroy
+  # -------------------------------------------------------------------------
+  - echo "0 */2 * * * root /sbin/shutdown -h now" >> /etc/crontab
+
+# Message displayed at the end of cloud-init
+# $UPTIME is replaced with actual boot time
+final_message: "K3s + ArgoCD ready after $UPTIME seconds. Auto-shutdown in 2 hours."

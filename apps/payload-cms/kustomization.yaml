@@ -1,0 +1,46 @@
+# =============================================================================
+# PayloadCMS Kustomization
+# =============================================================================
+#
+# Aggregates all Kubernetes resources for the PayloadCMS application.
+# Kustomize provides:
+#   - Resource aggregation (one entry point for ArgoCD)
+#   - Common label injection (for consistent pod selection)
+#   - Secret generation (demo only - use SealedSecrets in production)
+#
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# List of manifest files to include
+# Order matters for dependencies - Postgres should be ready before PayloadCMS
+resources:
+  - postgres.yaml # Database must exist first
+  - deployment.yaml # PayloadCMS application
+  - service.yaml # Internal ClusterIP service
+  - ingress.yaml # External access via Traefik
+
+# Apply common labels to ALL resources
+# This ensures consistent label selectors across the application
+commonLabels:
+  app: payload-cms
+
+# =============================================================================
+# Secret Generation - ⚠️ DEMO ONLY!
+# =============================================================================
+# WARNING: secretGenerator stores secrets in Git (Base64, NOT encrypted!)
+#
+# FOR PRODUCTION, use one of:
+#   - Sealed Secrets: https://sealed-secrets.netlify.app/
+#   - External Secrets: https://external-secrets.io/
+#   - HashiCorp Vault: https://www.vaultproject.io/
+#
+# These tools encrypt secrets before committing to Git, and decrypt
+# at deployment time using cluster-side controllers.
+# =============================================================================
+secretGenerator:
+  - name: payload-env
+    literals:
+      # ⚠️ DEMO VALUES - Replace with real secrets in production!
+      - PAYLOAD_SECRET=super-secret-key-for-demo-only
+      - DATABASE_URI=postgres://postgres:password@postgres:5432/payload

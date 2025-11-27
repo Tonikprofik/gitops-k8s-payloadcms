@@ -1,0 +1,65 @@
+# =============================================================================
+# ArgoCD App-of-Apps Bootstrap
+# =============================================================================
+#
+# This is the SINGLE entrypoint that deploys all other applications.
+# The "App-of-Apps" pattern means this one Application watches a directory
+# containing other Application manifests. When you add a new YAML file to
+# argocd/applications/, ArgoCD automatically picks it up and deploys it.
+#
+# USAGE:
+#   kubectl apply -f argocd/bootstrap.yaml
+#   (Only run this ONCE - ArgoCD handles everything else via GitOps)
+#
+# WHY THIS PATTERN?
+#   1. Single command bootstraps entire cluster
+#   2. Adding new apps = adding a YAML file (no kubectl needed)
+#   3. Git becomes the single source of truth
+#   4. ArgoCD self-heals any drift from desired state
+#
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bootstrap
+  namespace: argocd
+  # Finalizer ensures ArgoCD cleans up child resources when this app is deleted.
+  # This prevents orphaned resources in the cluster.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project scopes what resources this app can access.
+  # 'default' project has full cluster access (fine for demos).
+  # Production: Create custom projects with RBAC restrictions.
+  project: default
+
+  source:
+    # Git repository containing all manifests
+    repoURL: https://github.com/Tonikprofik/gitops-k8s-payloadcms
+    # Branch/tag to track (use tags for production stability)
+    targetRevision: main
+    # Path within repo to watch for Application manifests
+    path: argocd/applications
+    directory:
+      # Don't look in subdirectories (keeps structure flat and simple)
+      recurse: false
+
+  destination:
+    # Deploy to the same cluster ArgoCD is running on
+    # For multi-cluster: use the cluster's API server URL from ArgoCD cluster secrets
+    server: https://kubernetes.default.svc
+    # Namespace where child Application CRDs are created
+    # (The actual app workloads deploy to their own namespaces)
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      # prune: Delete resources that are no longer in Git
+      # (If you remove a file from argocd/applications/, the app gets deleted)
+      prune: true
+      # selfHeal: Automatically revert manual changes made via kubectl
+      # (Enforces GitOps - all changes must go through Git)
+      selfHeal: true
+    syncOptions:
+      # Create the target namespace if it doesn't exist
+      - CreateNamespace=true

@@ -1,0 +1,53 @@
+# =============================================================================
+# PayloadCMS Ingress
+# =============================================================================
+#
+# Ingress exposes the PayloadCMS Service externally via HTTP.
+# k3s includes Traefik as the default ingress controller.
+#
+# LOCAL DEVELOPMENT:
+#   1. Add to /etc/hosts: 127.0.0.1 payload.localhost
+#   2. Access: http://payload.localhost:8080
+#   (Port 8080 is mapped by k3d cluster config)
+#
+# PRODUCTION:
+#   - Use a real domain with DNS pointing to your cluster
+#   - Add TLS with cert-manager for HTTPS
+#   - Consider adding authentication annotations
+#
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: payload-cms
+  annotations:
+    # Ingress class selects which controller handles this Ingress
+    # k3s default is Traefik, k3d also uses Traefik
+    # For nginx ingress controller, change to: nginx
+    kubernetes.io/ingress.class: traefik
+
+    # Additional annotations for production:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod  # Auto TLS
+    # traefik.ingress.kubernetes.io/rate-limit: "100"   # Rate limiting
+
+spec:
+  rules:
+    # Host-based routing: Only requests to this hostname are routed here
+    - host: payload.localhost
+      http:
+        paths:
+          # Catch-all path - all requests go to PayloadCMS
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                # Route to the payload-cms Service
+                name: payload-cms
+                port:
+                  number: 80
+
+  # TLS configuration (uncomment for HTTPS)
+  # tls:
+  #   - hosts:
+  #       - payload.yourdomain.com
+  #     secretName: payload-tls-cert

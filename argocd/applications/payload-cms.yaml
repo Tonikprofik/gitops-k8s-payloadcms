@@ -1,0 +1,51 @@
+# =============================================================================
+# PayloadCMS Application
+# =============================================================================
+#
+# Deploys PayloadCMS - a TypeScript/React/Next.js headless CMS.
+# This is the main application workload for the pet blog project.
+#
+# COMPONENTS:
+#   - PayloadCMS Deployment: Next.js app container
+#   - PostgreSQL StatefulSet: Persistent database
+#   - Service: ClusterIP for internal access
+#   - Ingress: External access via Traefik
+#
+# ACCESS:
+#   Add to /etc/hosts: 127.0.0.1 payload.localhost
+#   Then visit: http://payload.localhost:8080
+#
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: payload-cms
+  namespace: argocd
+  annotations:
+    # SYNC WAVE: 1 means "deploy AFTER wave -1 (observability)"
+    # This ensures:
+    # 1. Prometheus is ready to scrape app metrics from startup
+    # 2. Loki captures all application logs
+    # 3. If app fails to start, we have full observability for debugging
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Tonikprofik/gitops-k8s-payloadcms
+    targetRevision: main
+    # Points to Kustomization with raw K8s manifests
+    path: apps/payload-cms
+
+  destination:
+    server: https://kubernetes.default.svc
+    # Dedicated namespace for application workload
+    # Keeps app resources isolated from infra (argocd, monitoring)
+    namespace: payload
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

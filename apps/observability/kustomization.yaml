@@ -1,0 +1,61 @@
+# =============================================================================
+# Observability Stack Kustomization
+# =============================================================================
+#
+# This Kustomization deploys the full observability stack using Helm charts
+# rendered via Kustomize's helmCharts feature. This approach:
+#
+# WHY HELM-IN-KUSTOMIZE (vs pure Helm)?
+#   1. No Helm CLI required - ArgoCD renders charts natively
+#   2. Values files are versioned alongside manifests
+#   3. Kustomize patches can overlay Helm output if needed
+#   4. Single tool (Kustomize) for both raw manifests and charts
+#
+# COMPONENTS:
+#   - kube-prometheus-stack: Prometheus + Grafana + node-exporter + kube-state-metrics
+#   - loki-stack: Loki (log storage) + Promtail (log shipper)
+#
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# All resources created in this namespace
+namespace: monitoring
+
+helmCharts:
+  # ---------------------------------------------------------------------------
+  # Prometheus + Grafana Stack
+  # ---------------------------------------------------------------------------
+  # The kube-prometheus-stack is a comprehensive monitoring solution that includes:
+  #   - Prometheus Operator (manages Prometheus instances)
+  #   - Prometheus (metrics collection, storage, alerting)
+  #   - Grafana (dashboards, visualization)
+  #   - AlertManager (alert routing)
+  #   - node-exporter (host metrics)
+  #   - kube-state-metrics (Kubernetes object metrics)
+  #
+  # Chart source: https://github.com/prometheus-community/helm-charts
+  - name: kube-prometheus-stack
+    repo: https://prometheus-community.github.io/helm-charts
+    version: 56.0.0
+    releaseName: prometheus
+    # Custom values: Enables Grafana, sets admin password, adds Loki datasource
+    valuesFile: values-prometheus.yaml
+
+  # ---------------------------------------------------------------------------
+  # Loki Log Aggregation Stack
+  # ---------------------------------------------------------------------------
+  # Loki is a horizontally-scalable log aggregation system inspired by Prometheus.
+  # Unlike Elasticsearch, Loki indexes only metadata (labels), not log content.
+  # This makes it more efficient for Kubernetes where labels are rich.
+  #
+  # Promtail runs as DaemonSet, ships logs from all pods to Loki.
+  # Query logs in Grafana using LogQL (similar to PromQL).
+  #
+  # Chart source: https://github.com/grafana/helm-charts
+  - name: loki-stack
+    repo: https://grafana.github.io/helm-charts
+    version: 2.9.10
+    releaseName: loki
+    # Custom values: Disables built-in Grafana (we use prometheus-stack's Grafana)
+    valuesFile: values-loki.yaml

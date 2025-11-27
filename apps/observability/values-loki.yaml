@@ -1,0 +1,45 @@
+# =============================================================================
+# Loki Stack Values
+# =============================================================================
+#
+# Configuration for loki-stack Helm chart (Loki + Promtail).
+# Optimized for demo/development - not production-ready.
+#
+# PRODUCTION CONSIDERATIONS:
+#   - Enable persistence with proper StorageClass
+#   - Use S3/GCS/Azure for chunk storage (loki.storage.type: s3)
+#   - Configure resource limits based on log volume
+#   - Set up retention policies
+#
+# Full options: https://github.com/grafana/helm-charts/blob/main/charts/loki-stack/values.yaml
+#
+# =============================================================================
+
+loki:
+  enabled: true
+  # Not the default data source in Grafana (Prometheus is default for dashboards)
+  isDefault: false
+
+  persistence:
+    # DEMO: Disabled for simplicity (logs lost on pod restart)
+    # PRODUCTION: Enable with proper StorageClass
+    # enabled: true
+    # storageClassName: standard
+    # size: 10Gi
+    enabled: false
+    size: 10Gi
+
+# Promtail is the log shipping agent
+# Runs as DaemonSet on every node to collect container logs
+promtail:
+  enabled: true
+  config:
+    clients:
+      # Push logs to Loki's ingest endpoint
+      # Promtail automatically discovers pods and adds Kubernetes labels
+      - url: http://loki:3100/loki/api/v1/push
+
+# Disable Grafana - we use the one bundled with kube-prometheus-stack
+# This avoids running two Grafana instances and keeps config in one place
+grafana:
+  enabled: false

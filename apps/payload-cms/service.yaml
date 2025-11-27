@@ -1,0 +1,36 @@
+# =============================================================================
+# PayloadCMS Service
+# =============================================================================
+#
+# ClusterIP Service exposes the PayloadCMS Deployment internally.
+# External access is provided via the Ingress resource.
+#
+# SERVICE TYPES:
+#   - ClusterIP (used here): Internal only, accessed via Ingress
+#   - NodePort: Exposes on each node's IP at a static port
+#   - LoadBalancer: Provisions cloud load balancer (costly)
+#
+# PORT MAPPING:
+#   External port 80 → Container port 3000
+#   This allows the Ingress to route HTTP traffic without port in URL
+#
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: payload-cms
+spec:
+  # Select pods with this label
+  selector:
+    app: payload-cms
+
+  ports:
+    - protocol: TCP
+      # Port exposed by the Service (what Ingress connects to)
+      port: 80
+      # Port on the container (Next.js default)
+      targetPort: 3000
+
+  # ClusterIP: Only accessible within the cluster
+  # Ingress controller routes external traffic to this service
+  type: ClusterIP

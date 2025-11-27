@@ -1,0 +1,41 @@
+# =============================================================================
+# GitOps K8s PayloadCMS - .gitignore
+# =============================================================================
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Kubernetes
+kubeconfig_*
+*.kubeconfig
+
+# Secrets (never commit!)
+.env
+.env.*
+*.pem
+*.key
+secrets.yaml
+*-secret.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+charts/

@@ -1,0 +1,102 @@
+# =============================================================================
+# PostgreSQL StatefulSet
+# =============================================================================
+#
+# StatefulSet (not Deployment) for the database because we need:
+#   1. Stable network identity (postgres-0, not postgres-xyz)
+#   2. Stable persistent storage (PVC survives pod restarts)
+#   3. Ordered startup/shutdown (important for replicas)
+#
+# PRODUCTION CONSIDERATIONS:
+#   - Use managed PostgreSQL (RDS, Cloud SQL, Neon)
+#   - Or use a Kubernetes operator (CloudNativePG, Zalando)
+#   - Add backups, monitoring, connection pooling
+#   - Never use default passwords!
+#
+# =============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  # Selector must match pod template labels
+  selector:
+    matchLabels:
+      app: postgres
+
+  # Headless service name (see Service below)
+  # Pods get DNS: postgres-0.postgres.payload.svc.cluster.local
+  serviceName: "postgres"
+
+  # Single replica (add more for HA with streaming replication)
+  replicas: 1
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          # Alpine variant is smaller (~80MB vs ~300MB)
+          image: postgres:16-alpine
+
+          ports:
+            - containerPort: 5432
+
+          # PostgreSQL configuration via environment variables
+          # ⚠️ DEMO ONLY - Hardcoded credentials!
+          # Production: Use SealedSecrets or External Secrets Operator
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: password  # ⚠️ CHANGE IN PRODUCTION!
+            - name: POSTGRES_DB
+              value: payload # Database created on first startup
+
+          # Mount persistent volume for data directory
+          volumeMounts:
+            - name: postgres-persistent-storage
+              mountPath: /var/lib/postgresql/data
+
+  # PERSISTENT VOLUME CLAIM TEMPLATE
+  # StatefulSet creates a unique PVC for each replica (postgres-persistent-storage-postgres-0)
+  # PVC persists even if pod is deleted, preserving data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-persistent-storage
+      spec:
+        # ReadWriteOnce: Can be mounted read-write by a single node
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            # 1 GiB is enough for development
+            # Production: Size based on expected data volume
+            storage: 1Gi
+
+---
+# =============================================================================
+# PostgreSQL Headless Service
+# =============================================================================
+#
+# A "headless" service (clusterIP: None) doesn't load-balance.
+# Instead, it provides DNS records for each pod directly:
+#   postgres-0.postgres.payload.svc.cluster.local
+#
+# This is required for StatefulSet to provide stable network identity.
+# For client connections, use the service name: postgres:5432
+#
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  # Headless service - no ClusterIP, direct pod access
+  clusterIP: None
+  selector:
+    app: postgres
