@@ -12,14 +12,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
 
       - name: Validate Kustomize - PayloadCMS
-        run: kubectl kustomize apps/payload-cms/ > /dev/null
+        run: kustomize build apps/payload-cms/ > /dev/null
 
-      - name: Validate Kustomize - Observability
-        run: kubectl kustomize apps/observability/ > /dev/null
+      - name: Validate Kustomize - Observability (with Helm)
+        run: kustomize build --enable-helm apps/observability/ > /dev/null
 
       - name: YAML Lint
         uses: ibiqlik/action-yamllint@v3
